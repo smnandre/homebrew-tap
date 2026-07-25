@@ -1,4 +1,4 @@
-# Smnandre Tap
+# smnandre Homebrew Tap
 
 ## How do I install these formulae?
 
