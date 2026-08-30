@@ -1,6 +1,6 @@
 # smnandre Homebrew Tap
 
-## How do I install these formulae?
+## Formulae
 
 `brew install smnandre/tap/<formula>`
 
@@ -12,6 +12,29 @@ Or, in a `brew bundle` `Brewfile`:
 tap "smnandre/tap"
 brew "<formula>"
 ```
+
+## Casks
+
+Install Symfony CLI Menu Bar with its fully qualified cask name:
+
+```bash
+brew install --cask smnandre/tap/symfony-cli-menubar
+```
+
+This adds the tap and trusts this cask. Subsequent commands can use the short name:
+
+```bash
+brew upgrade --cask symfony-cli-menubar
+brew uninstall --cask symfony-cli-menubar
+```
+
+If Homebrew reports that the cask is not trusted:
+
+```bash
+brew trust --cask smnandre/tap/symfony-cli-menubar
+```
+
+Trust only the cask, not the entire tap.
 
 ## Documentation
 
