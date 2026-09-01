@@ -1,6 +1,6 @@
 cask "quickemoji" do
-  version "0.1.0"
-  sha256 "311e234dc73702e5ad356800f0bdfc2681c69208f9295081b731a792a87a8a59"
+  version "1.0.0"
+  sha256 "aa0e77a1065dfcb4694b9fee6af8c7d053b4788640064a9a3f13a305344e4cd6"
 
   url "https://github.com/smnandre/QuickEmoji/releases/download/v#{version}/QuickEmoji-#{version}.dmg"
   name "QuickEmoji"
