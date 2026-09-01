@@ -47,6 +47,33 @@ jobs:
             brew uninstall --cask symfony-cli-menubar
           fi
 
+      - name: Validate QuickEmoji cask
+        if: hashFiles('Casks/quickemoji.rb') != ''
+        run: |
+          CASK="smnandre/tap/quickemoji"
+          APP="/Applications/QuickEmoji.app"
+
+          brew trust --cask "$CASK"
+          brew style --cask "$CASK"
+          brew audit --strict --online --cask "$CASK"
+          brew install --cask "$CASK"
+
+          CASK_VERSION=$(brew info --json=v2 --cask "$CASK" | ruby -rjson -e 'puts JSON.parse(STDIN.read).fetch("casks").first.fetch("version")')
+          file "$APP/Contents/MacOS/QuickEmoji" | grep 'arm64'
+          test "$(plutil -extract CFBundleShortVersionString raw -o - "$APP/Contents/Info.plist")" = "$CASK_VERSION"
+          test "$(plutil -extract CFBundleIdentifier raw -o - "$APP/Contents/Info.plist")" = "dev.smnandre.quickemoji"
+          codesign --verify --deep --strict --verbose=2 "$APP"
+          codesign --display --verbose=4 "$APP" 2>&1 | grep 'Authority=Developer ID Application: Simon André (3D8DYUPC57)'
+          codesign --display --verbose=4 "$APP" 2>&1 | grep 'TeamIdentifier=3D8DYUPC57'
+          spctl --assess --type execute --verbose=2 "$APP"
+
+      - name: Uninstall QuickEmoji cask
+        if: always() && hashFiles('Casks/quickemoji.rb') != ''
+        run: |
+          if brew list --cask quickemoji > /dev/null 2>&1; then
+            brew uninstall --cask quickemoji
+          fi
+
   test-bot:
     strategy:
       matrix:
