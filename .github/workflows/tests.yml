@@ -1,120 +1,87 @@
 name: brew test-bot
 
 on:
-  push:
-    branches:
-      - main
   pull_request:
 
 jobs:
   cask:
-    if: github.event_name == 'pull_request'
     runs-on: macos-26
     permissions:
       actions: read
       contents: read
       pull-requests: read
     steps:
+      - name: Clean taps
+        run: |
+          for TAP in aws/tap hashicorp/tap; do
+            if brew tap | grep -qx "$TAP"; then
+              brew untap --force "$TAP"
+            fi
+          done
+
       - name: Set up Homebrew
-        uses: Homebrew/actions/setup-homebrew@9af03b7ae3f9e2ae5c174f659d5c3909f7e7dbac  # 2026.07.29.1
+        uses: Homebrew/actions/setup-homebrew@9af03b7ae3f9e2ae5c174f659d5c3909f7e7dbac
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Validate Symfony CLI Menu Bar cask
-        if: hashFiles('Casks/symfony-cli-menubar.rb') != ''
+      - name: Validate casks
         run: |
-          CASK="smnandre/tap/symfony-cli-menubar"
-          APP="/Applications/SymfonyCLIMenuBar.app"
+          set -euo pipefail
+          CURRENT_CASK=""
+          cleanup() {
+            if [ -n "$CURRENT_CASK" ] && brew list --cask "$CURRENT_CASK" > /dev/null 2>&1; then
+              brew uninstall --cask "$CURRENT_CASK"
+            fi
+          }
+          trap cleanup EXIT
+          for CASK_FILE in Casks/*.rb; do
+            TOKEN=$(basename "$CASK_FILE" .rb)
+            CURRENT_CASK="smnandre/tap/$TOKEN"
+            brew trust --cask "$CURRENT_CASK"
+            brew style --cask "$CURRENT_CASK"
+            brew audit --strict --online --cask "$CURRENT_CASK"
+            brew install --cask "$CURRENT_CASK"
+            INFO=$(brew info --json=v2 --cask "$CURRENT_CASK")
+            CASK_VERSION=$(ruby -rjson -e 'puts JSON.parse(STDIN.read).fetch("casks").first.fetch("version")' <<< "$INFO")
+            APP_NAME=$(ruby -rjson -e '
+              c = JSON.parse(STDIN.read).fetch("casks").first
+              puts c.fetch("artifacts").find { |artifact| artifact.key?("app") }.fetch("app").first
+            ' <<< "$INFO")
+            BUNDLE_ID=$(ruby -rjson -e '
+              c = JSON.parse(STDIN.read).fetch("casks").first
+              uninstall = c.fetch("artifacts").find { |artifact| artifact.key?("uninstall") }
+              puts uninstall.fetch("uninstall").first.fetch("quit")
+            ' <<< "$INFO")
+            APP="/Applications/$APP_NAME"
+            PLIST="$APP/Contents/Info.plist"
+            EXECUTABLE=$(plutil -extract CFBundleExecutable raw -o - "$PLIST")
+            file "$APP/Contents/MacOS/$EXECUTABLE" | grep 'arm64'
+            test "$(plutil -extract CFBundleShortVersionString raw -o - "$PLIST")" = "$CASK_VERSION"
+            test "$(plutil -extract CFBundleIdentifier raw -o - "$PLIST")" = "$BUNDLE_ID"
+            codesign --verify --deep --strict --verbose=2 "$APP"
+            codesign --display --verbose=4 "$APP" 2>&1 | grep 'Authority=Developer ID Application:'
+            codesign --display --verbose=4 "$APP" 2>&1 | grep 'TeamIdentifier=3D8DYUPC57'
+            spctl --assess --type execute --verbose=2 "$APP"
+            brew uninstall --cask "$CURRENT_CASK"
+            CURRENT_CASK=""
+          done
 
-          brew trust --cask "$CASK"
-          brew style --cask "$CASK"
-          brew audit --strict --online --cask "$CASK"
-          brew install --cask "$CASK"
-
-          CASK_VERSION=$(brew info --json=v2 --cask "$CASK" | ruby -rjson -e 'puts JSON.parse(STDIN.read).fetch("casks").first.fetch("version")')
-          file "$APP/Contents/MacOS/SymfonyCLIMenuBar" | grep 'arm64'
-          test "$(plutil -extract CFBundleShortVersionString raw -o - "$APP/Contents/Info.plist")" = "$CASK_VERSION"
-          test "$(plutil -extract CFBundleIdentifier raw -o - "$APP/Contents/Info.plist")" = "dev.smnandre.symfony-cli-menubar"
-          codesign --verify --deep --strict --verbose=2 "$APP"
-          codesign --display --verbose=4 "$APP" 2>&1 | grep 'Authority=Developer ID Application: Simon André (3D8DYUPC57)'
-          codesign --display --verbose=4 "$APP" 2>&1 | grep 'TeamIdentifier=3D8DYUPC57'
-          spctl --assess --type execute --verbose=2 "$APP"
-
-      - name: Uninstall Symfony CLI Menu Bar cask
-        if: always() && hashFiles('Casks/symfony-cli-menubar.rb') != ''
-        run: |
-          if brew list --cask symfony-cli-menubar > /dev/null 2>&1; then
-            brew uninstall --cask symfony-cli-menubar
-          fi
-
-      - name: Validate QuickEmoji cask
-        if: hashFiles('Casks/quickemoji.rb') != ''
-        run: |
-          CASK="smnandre/tap/quickemoji"
-          APP="/Applications/QuickEmoji.app"
-
-          brew trust --cask "$CASK"
-          brew style --cask "$CASK"
-          brew audit --strict --online --cask "$CASK"
-          brew install --cask "$CASK"
-
-          CASK_VERSION=$(brew info --json=v2 --cask "$CASK" | ruby -rjson -e 'puts JSON.parse(STDIN.read).fetch("casks").first.fetch("version")')
-          file "$APP/Contents/MacOS/QuickEmoji" | grep 'arm64'
-          test "$(plutil -extract CFBundleShortVersionString raw -o - "$APP/Contents/Info.plist")" = "$CASK_VERSION"
-          test "$(plutil -extract CFBundleIdentifier raw -o - "$APP/Contents/Info.plist")" = "dev.smnandre.quickemoji"
-          codesign --verify --deep --strict --verbose=2 "$APP"
-          codesign --display --verbose=4 "$APP" 2>&1 | grep 'Authority=Developer ID Application: Simon André (3D8DYUPC57)'
-          codesign --display --verbose=4 "$APP" 2>&1 | grep 'TeamIdentifier=3D8DYUPC57'
-          spctl --assess --type execute --verbose=2 "$APP"
-
-      - name: Uninstall QuickEmoji cask
-        if: always() && hashFiles('Casks/quickemoji.rb') != ''
-        run: |
-          if brew list --cask quickemoji > /dev/null 2>&1; then
-            brew uninstall --cask quickemoji
-          fi
-
-  test-bot:
-    strategy:
-      matrix:
-        os: [macos-15-intel, macos-26]
-        include:
-          - os: ubuntu-latest
-            container:
-              image: ghcr.io/homebrew/brew:main
-              options: --privileged
-    runs-on: ${{ matrix.os }}
-    container: ${{ fromJSON(toJSON(matrix.container)) }}  # zizmor: ignore[unpinned-images]
+  merge:
+    if: >-
+      always() &&
+      github.event_name == 'pull_request' &&
+      needs.cask.result == 'success' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      startsWith(github.head_ref, 'release/') &&
+      github.event.pull_request.user.login == 'smnandre'
+    needs: cask
+    runs-on: ubuntu-latest
     permissions:
-      actions: read
-      checks: read
-      contents: read
-      pull-requests: read
+      contents: write
+      pull-requests: write
     steps:
-      - name: Set up Homebrew
-        id: set-up-homebrew
-        uses: Homebrew/actions/setup-homebrew@9af03b7ae3f9e2ae5c174f659d5c3909f7e7dbac  # 2026.07.29.1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Cache Homebrew Bundler RubyGems
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
-        with:
-          path: ${{ steps.set-up-homebrew.outputs.gems-path }}
-          key: ${{ matrix.os }}-rubygems-${{ steps.set-up-homebrew.outputs.gems-hash }}
-          restore-keys: ${{ matrix.os }}-rubygems-
-
-      - run: brew test-bot --only-cleanup-before
-
-      - run: brew test-bot --only-setup
-
-      - run: brew test-bot --only-tap-syntax
-      - run: brew test-bot --only-formulae
-        if: github.event_name == 'pull_request'
-
-      - name: Upload bottles as artifact
-        if: always() && github.event_name == 'pull_request'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
-        with:
-          name: bottles_${{ matrix.os }}
-          path: '*.bottle.*'
+      - name: Merge
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: gh pr merge "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --squash --delete-branch
