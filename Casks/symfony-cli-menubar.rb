@@ -1,11 +1,11 @@
 cask "symfony-cli-menubar" do
-  version "1.0.0"
-  sha256 "2c2e2decc8fa6b448bd4a3808654156c368017284a6f1b4ee7639d015d745b27"
+  version "1.0.1"
+  sha256 "128698bd0af1261776f5bf7198472ef4cf594c38b0075e36df7f9a66f1c89270"
 
   url "https://github.com/smnandre/symfony-cli-menubar/releases/download/v#{version}/SymfonyCLIMenuBar-#{version}.dmg"
   name "Symfony CLI Menu Bar"
   desc "Manage Symfony CLI servers from the menu bar"
-  homepage "https://github.com/smnandre/symfony-cli-menubar"
+  homepage "https://smnand.re/sfmenubar"
 
   livecheck do
     url :url
@@ -13,7 +13,7 @@ cask "symfony-cli-menubar" do
   end
 
   depends_on arch: :arm64
-  depends_on macos: :sonoma
+  depends_on macos: :tahoe
 
   app "SymfonyCLIMenuBar.app"
 
